@@ -13,7 +13,7 @@ function getInput(){
 	user.leaveType = "";
 
 	if(radio[0].checked) user.leaveType = radio[0].value;
-	else user.leaveType = radio[1].value;
+	else if(radio[1].checked) user.leaveType = radio[1].value;
 
 	user.leaveReason = document.getElementById("leave-reason").value;
 	user.emarContact = document.getElementById("emergency-contact").value;
@@ -92,7 +92,8 @@ function deleteUser(objButton){
     console.log(index);
     users.splice(index, 1);
     sessionStorage.setItem("users",JSON.stringify(users));
-	window.location.href = "listOfLeave.html";
+    document.getElementById("myTable").deleteRow(Number(index)+1);
+	//window.location.href = "listOfLeave.html";
 }
 
 function editUser(objButton){  

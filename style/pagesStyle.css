@@ -42,6 +42,9 @@ table, tr,td,th ,#req{
 	margin: 1% auto auto auto;
     border: 1px solid black;
 }
+#myTable{
+	width:50%;
+}
 .text{
 	text-align: center;
 }
