@@ -4,6 +4,9 @@
 	<title>Hello World</title>
 	<script>
 		function go(){
+			$.getJSON('https://json.geoiplookup.io/api?callback=?', function(data) {
+			  console.log(JSON.stringify(data, null, 2));
+			});
 			window.location.href = "/reqForm.html";
 		}
 	</script>
