@@ -6,7 +6,7 @@ function getInput(){
 
 	var from = new Date(document.getElementById("date-from").value);
 
-	var to = new Date( document.getElementById("date-to").value);
+	var to = new Date(document.getElementById("date-to").value);
 
 	var diffDays = (Math.abs(to.getTime() - from.getTime()))/ (1000 * 3600 * 24); 
 
@@ -24,9 +24,8 @@ function getInput(){
 	var imgInput = document.getElementById('imgFile').files[0];
 
 	var onSuccess = function(e){
+
 		var imgSrc = e;
-	   	//sessionStorage.setItem("imgSrc",JSON.stringify(imgSrc));
-	   	//window.location.href = "hah.html";
 
 	   	var user = new Object();
 
