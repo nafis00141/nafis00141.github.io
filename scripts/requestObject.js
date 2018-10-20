@@ -4,44 +4,24 @@ var userId = -1;
 
 function getInput(){
 
-	var from = new Date(document.getElementById("date-from").value);
+	var user = new Object();
 
-	var to = new Date(document.getElementById("date-to").value);
-
-	var diffDays = (Math.abs(to.getTime() - from.getTime()))/ (1000 * 3600 * 24); 
-
+	user.from = new Date(document.getElementById("date-from").value);
+	user.to = new Date(document.getElementById("date-to").value);
+	user.leaveTime = (Math.abs(user.to.getTime() - user.from.getTime()))/ (1000 * 3600 * 24) + 1; 
 	var radio = document.getElementsByName("leaveType");
-	
-	var type = "";
+	user.leaveType = "";
 
-	if(radio[0].checked) type = radio[0].value;
-	else type = radio[1].value;
+	if(radio[0].checked) user.leaveType = radio[0].value;
+	else user.leaveType = radio[1].value;
 
-	var leaveReason = document.getElementById("leave-reason");
-
-	var eContact = document.getElementById("emergency-contact");
-
+	user.leaveReason = document.getElementById("leave-reason").value;
+	user.emarContact = document.getElementById("emergency-contact").value;
 	var imgInput = document.getElementById('imgFile').files[0];
 
 	var onSuccess = function(e){
 
-		var imgSrc = e;
-
-	   	var user = new Object();
-
-	   	user.from = from;
-
-		user.to = to;
-
-		user.leaveTime = diffDays;
-
-		user.leaveType = type;
-
-		user.leaveReason = leaveReason.value;
-
-		user.emarContact = eContact.value;
-
-		user.img = imgSrc;
+		user.img = e;
 
 		if(userId!=-1){
 			users[userId] = user;
@@ -50,7 +30,6 @@ function getInput(){
 		else{
 			users.push(user);
 		}
-
 
 		console.log(users);
 
@@ -85,11 +64,8 @@ function showTable(){
 	for(var i=0;i<users.length;i++){
 		var user = users[i];
 
-		console.log('right here');
-		console.log(user);
-
-		//user.img.height = 30;
-		//user.img.width = 30;
+		//console.log('right here');
+		//console.log(user);
 
 		var table = document.getElementById("myTable");
 	    var row = table.insertRow(i+1);
