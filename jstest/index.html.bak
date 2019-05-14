@@ -4,7 +4,7 @@
 	<title>Hello World</title>
 	<script>
 		function go(){
-			window.location.href = "/jstest/reqForm.html";
+			window.location.href = "jstest/reqForm.html";
 		}
 	</script>
 </head>

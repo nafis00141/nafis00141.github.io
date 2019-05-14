@@ -104,7 +104,7 @@ function editUser(objButton){
 function reqPage(){
 	sessionStorage.setItem("users",JSON.stringify(users));
 	sessionStorage.setItem("userId",JSON.stringify(userId));
-	window.location.href = "/jstest/reqForm.html";
+	window.location.href = "jstest/reqForm.html";
 }
 
 function dataForEdit(){
