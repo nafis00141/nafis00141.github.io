@@ -1,0 +1,56 @@
+.flex-container {
+	display: flex;
+}
+.flex-container > div {
+	margin: 2%;
+	padding: 4%;
+}
+#content-border {
+	border: 1px solid black;
+	width: 40%;
+	margin: 5% auto auto auto;
+
+}
+#reqHeader{
+	text-align: center;
+}
+#date-from{
+	border: 1px solid black;
+	margin-right: 7%;
+}
+
+#date-to{
+	border: 1px solid black;
+}
+#leave-reason{
+	width:375px; 
+	height:45px; 
+	border: 1px solid black;
+}
+.in{
+	border: 1px solid black; 
+	width:375px;
+}
+#submit-button{
+	float: right;
+}
+#listHeader{
+	text-align: center;
+	margin: 5% auto auto auto;
+}
+table, tr,td,th ,#req{
+	margin: 1% auto auto auto;
+    border: 1px solid black;
+}
+#myTable{
+	width:50%;
+}
+.text{
+	text-align: center;
+}
+.pic{
+	text-align: center;
+}
+#req{
+	margin: auto auto auto 60%;
+}
