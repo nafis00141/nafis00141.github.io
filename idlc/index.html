@@ -179,10 +179,12 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
-// Google Sheets "Publish to web" links (CSV). Only the NAV and Holdings tabs are published.
+// Live feed: the Apps Script web app (apps-script/Api.gs) reads the sheet on every request,
+// so new rows show up immediately. It can only return the NAV and Holdings tabs.
 // ?csv=...&holdings=... in the page URL override these (for testing).
-var CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTnZ76x1nDTVQvXKi5Iib-9fTuNEyjHfQCnR7pt-yd-ZfuCguVUjUozVTkFhPS9_PkcMaU_Vrqy59WM/pub?gid=0&single=true&output=csv';
-var HOLDINGS_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTnZ76x1nDTVQvXKi5Iib-9fTuNEyjHfQCnR7pt-yd-ZfuCguVUjUozVTkFhPS9_PkcMaU_Vrqy59WM/pub?gid=1619865244&single=true&output=csv';
+var FEED_URL = 'https://script.google.com/macros/s/AKfycbz4f8212rpBBuJgZ3ISiOzx8y7FUz12fPzH6mwAQ4bQQfjA9BWN4K36f0zafwA1-KgI/exec';
+var CSV_URL = FEED_URL + '?sheet=nav';
+var HOLDINGS_CSV_URL = FEED_URL + '?sheet=holdings';
 
 var FUNDS = [
   { name: 'IDLC Balanced Fund', short: 'Balanced', color: '--series-1' },
