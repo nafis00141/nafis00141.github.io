@@ -99,7 +99,7 @@
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
   .legend i { width: 14px; height: 2px; border-radius: 1px; display: inline-block; }
   .chart-box { position: relative; height: 340px; }
-  @media (max-width: 520px) { .chart-box { height: 260px; } .nav { font-size: 26px; } }
+  @media (max-width: 520px) { .chart-box { height: 260px; } .nav { font-size: 26px; } .seg button { padding: 5px 8px; } }
 
   .table-wrap { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -155,10 +155,13 @@
             <button data-mode="pct" aria-pressed="false">% change</button>
           </div>
           <div class="seg" id="range" role="group" aria-label="Time range">
-            <button data-days="30" aria-pressed="false">1M</button>
-            <button data-days="91" aria-pressed="false">3M</button>
-            <button data-days="365" aria-pressed="false">1Y</button>
-            <button data-days="0" aria-pressed="true">All</button>
+            <button data-months="1" aria-pressed="false">1M</button>
+            <button data-months="2" aria-pressed="false">2M</button>
+            <button data-months="3" aria-pressed="false">3M</button>
+            <button data-months="6" aria-pressed="false">6M</button>
+            <button data-months="12" aria-pressed="true">1Y</button>
+            <button data-months="24" aria-pressed="false">2Y</button>
+            <button data-months="36" aria-pressed="false">3Y</button>
           </div>
         </div>
       </div>
@@ -207,7 +210,7 @@ var FUNDS = [
   { name: 'IDLC Income Fund',   short: 'Income',   color: '--series-3' }
 ];
 
-var state = { days: 0, mode: 'nav', data: null, chart: null, holdings: {} };
+var state = { months: 12, mode: 'nav', data: null, chart: null, holdings: {} };
 
 function num(s) { var n = Number(String(s || '').replace(/,/g, '').trim()); return isFinite(n) ? n : NaN; }
 function money(x) { return x.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -432,8 +435,8 @@ var crosshair = {
 function renderChart() {
   var data = state.data;
   var dates = allDates(data);
-  if (state.days) {
-    var from = addDays(dates[dates.length - 1], -state.days);
+  if (state.months) {
+    var from = addMonths(dates[dates.length - 1], -state.months);
     dates = dates.filter(function (d) { return d >= from; });
   }
   var pct = state.mode === 'pct';
@@ -525,7 +528,7 @@ function renderChart() {
 function wireControls() {
   document.getElementById('range').addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b) return;
-    state.days = Number(b.dataset.days);
+    state.months = Number(b.dataset.months);
     this.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
     renderChart();
   });
