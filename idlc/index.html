@@ -116,6 +116,18 @@
   .state strong { display: block; color: var(--text); font-size: 17px; margin-bottom: 6px; }
   footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
   footer a { color: var(--text-2); }
+  .banner {
+    display: flex; align-items: center; gap: 10px; margin: -8px 0 16px; padding: 9px 14px;
+    background: var(--wash); border: 1px solid var(--border); border-radius: 10px;
+    font-size: 13px; color: var(--text-2);
+  }
+  .banner .spin {
+    width: 12px; height: 12px; flex: none; border-radius: 50%;
+    border: 2px solid var(--axis); border-top-color: var(--text-2); animation: spin .8s linear infinite;
+  }
+  .banner.offline .spin { animation: none; border-color: var(--down); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .banner .spin { animation: none; } }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -125,6 +137,8 @@
     <h1>IDLC NAV Dashboard</h1>
     <div class="sub" id="updated"></div>
   </header>
+
+  <div id="banner" class="banner" role="status" hidden><span class="spin" aria-hidden="true"></span><span id="banner-text"></span></div>
 
   <div id="loading" class="card state">Loading NAV data…</div>
   <div id="error" class="card state" hidden><strong>Data unavailable – try again later</strong><span id="error-detail"></span></div>
@@ -185,7 +199,7 @@
 var FEED_URL = 'https://script.google.com/macros/s/AKfycbz4f8212rpBBuJgZ3ISiOzx8y7FUz12fPzH6mwAQ4bQQfjA9BWN4K36f0zafwA1-KgI/exec';
 var ALL_URL = FEED_URL + '?sheet=all';          // both tabs in one request (what the page uses)
 var CACHE_KEY = 'idlc-feed-v1';                 // last good response, shown instantly on the next visit
-var REFRESH_MS = 5 * 60 * 1000;                 // re-check while the tab is open and visible
+var REFRESH_MS = 30 * 1000;                // re-check while the tab is open and visible
 
 var FUNDS = [
   { name: 'IDLC Balanced Fund', short: 'Balanced', color: '--series-1' },
@@ -565,6 +579,16 @@ function setStatus(note) {
     (data.fetched ? ' · checked ' + data.fetched + ' (Dhaka)' : '') + (note ? ' · ' + note : '');
 }
 
+// Banner shown while the page is drawing the copy saved on this device: 'updating' or 'offline'; '' hides it.
+function setBanner(mode) {
+  var b = document.getElementById('banner');
+  b.hidden = !mode;
+  b.className = 'banner' + (mode === 'offline' ? ' offline' : '');
+  document.getElementById('banner-text').textContent = mode === 'offline'
+    ? 'Offline – showing data saved on this device. Will retry automatically.'
+    : 'Showing saved data – updating to the latest…';
+}
+
 function readCache() {
   try { var c = JSON.parse(localStorage.getItem(CACHE_KEY)); return c && c.nav ? c : null; } catch (e) { return null; }
 }
@@ -584,10 +608,13 @@ function refresh() {
       var old = state.shown;
       if (!old || old.nav !== feed.nav || old.holdings !== feed.holdings) apply(feed);
       writeCache(feed);
+      state.fromSaved = false;
+      setBanner('');
       setStatus('');
     })
     .catch(function (e) {
       console.error('NAV feed:', e);
+      if (state.fromSaved) setBanner('offline');
       if (state.data) setStatus('offline – showing saved data'); else showError('');
     })
     .then(function () { state.busy = false; });
@@ -605,12 +632,12 @@ function load() {
   }
   // 1. Show the copy saved on this device instantly (if any), 2. fetch the live feed in the background.
   var saved = readCache();
-  if (saved) { try { apply(saved); } catch (e) { saved = null; } }
+  if (saved) { try { apply(saved); state.fromSaved = true; setBanner('updating'); } catch (e) { saved = null; } }
   refresh();
-  // Near-real-time: re-check every few minutes while visible, and right away when the tab comes back.
+  // Near-real-time: re-check every 30 s while visible, and right away when the tab comes back.
   setInterval(function () { if (!document.hidden) refresh(); }, REFRESH_MS);
   document.addEventListener('visibilitychange', function () {
-    if (!document.hidden && Date.now() - (state.lastTry || 0) > 60 * 1000) refresh();
+    if (!document.hidden && Date.now() - (state.lastTry || 0) > 15 * 1000) refresh();
   });
 }
 
