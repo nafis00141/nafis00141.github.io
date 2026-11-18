@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IDLC NAV Dashboard</title>
+<meta name="description" content="Daily NAV history of IDLC Balanced, Growth and Income funds.">
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --text: #0b0b0b;
+    --text-2: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --axis: #c3c2b7;
+    --border: rgba(11,11,11,0.10);
+    --up: #006300;
+    --down: #d03b3b;
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --series-3: #1baf7a;
+    --wash: rgba(11,11,11,0.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --page: #0d0d0d;
+      --surface: #1a1a19;
+      --text: #f0efec;
+      --text-2: #c3c2b7;
+      --muted: #898781;
+      --grid: #2c2c2a;
+      --axis: #383835;
+      --border: rgba(255,255,255,0.10);
+      --up: #0ca30c;
+      --down: #e66767;
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --series-3: #199e70;
+      --wash: rgba(255,255,255,0.06);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --text: #f0efec;
+    --text-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255,255,255,0.10);
+    --up: #0ca30c;
+    --down: #e66767;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --wash: rgba(255,255,255,0.06);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--text);
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 1040px; margin: 0 auto; padding: 24px 16px 48px; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; margin-bottom: 20px; }
+  h1 { font-size: 22px; margin: 0; font-weight: 650; }
+  h2 { font-size: 16px; margin: 0 0 12px; font-weight: 600; }
+  .sub { color: var(--text-2); font-size: 13px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  section { margin-bottom: 16px; }
+
+  .funds { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .fund-name { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; }
+  .swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  .nav { font-size: 30px; font-weight: 650; margin: 6px 0 0; }
+  .nav small { font-size: 13px; font-weight: 400; color: var(--text-2); margin-left: 4px; }
+  .delta { font-size: 14px; font-weight: 600; }
+  .delta.up { color: var(--up); }
+  .delta.down { color: var(--down); }
+  .delta.flat { color: var(--text-2); }
+  .facts { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; margin-top: 12px; font-size: 13px; color: var(--text-2); }
+  .facts b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .seg button {
+    font: inherit; font-size: 13px; padding: 5px 11px; border: 0; background: transparent; color: var(--text-2); cursor: pointer;
+  }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button:hover { background: var(--wash); }
+  .seg button[aria-pressed="true"] { background: var(--text); color: var(--surface); }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--text-2); margin-bottom: 8px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 14px; height: 2px; border-radius: 1px; display: inline-block; }
+  .chart-box { position: relative; height: 340px; }
+  @media (max-width: 520px) { .chart-box { height: 260px; } .nav { font-size: 26px; } }
+
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--grid); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--text-2); font-weight: 600; font-size: 12px; }
+  @media (max-width: 520px) { th, td { padding: 8px 5px; font-size: 13px; } th { font-size: 11px; } .hide-sm { display: none; } }
+  td.up { color: var(--up); }
+  td.down { color: var(--down); }
+  details summary { cursor: pointer; font-weight: 600; font-size: 16px; }
+  details[open] summary { margin-bottom: 12px; }
+
+  .state { text-align: center; padding: 48px 16px; color: var(--text-2); }
+  .state strong { display: block; color: var(--text); font-size: 17px; margin-bottom: 6px; }
+  footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
+  footer a { color: var(--text-2); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>IDLC NAV Dashboard</h1>
+    <div class="sub" id="updated"></div>
+  </header>
+
+  <div id="loading" class="card state">Loading NAV data…</div>
+  <div id="error" class="card state" hidden><strong>Data unavailable – try again later</strong><span id="error-detail"></span></div>
+
+  <div id="content" hidden>
+    <div class="funds" id="funds"></div>
+
+    <section class="card">
+      <div class="toolbar">
+        <h2 style="margin:0">NAV history</h2>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <div class="seg" id="mode" role="group" aria-label="Value shown">
+            <button data-mode="nav" aria-pressed="true">NAV</button>
+            <button data-mode="pct" aria-pressed="false">% change</button>
+          </div>
+          <div class="seg" id="range" role="group" aria-label="Time range">
+            <button data-days="30" aria-pressed="false">1M</button>
+            <button data-days="91" aria-pressed="false">3M</button>
+            <button data-days="365" aria-pressed="false">1Y</button>
+            <button data-days="0" aria-pressed="true">All</button>
+          </div>
+        </div>
+      </div>
+      <div class="legend" id="legend"></div>
+      <div class="chart-box"><canvas id="chart" aria-label="Line chart of NAV over time per fund" role="img"></canvas></div>
+    </section>
+
+    <section class="card" id="holdings-card" hidden>
+      <h2>My holdings</h2>
+      <div class="table-wrap"><table id="holdings"></table></div>
+      <p class="sub" id="holdings-note" style="margin:10px 0 0"></p>
+    </section>
+
+    <section class="card">
+      <h2>Performance</h2>
+      <div class="table-wrap"><table id="perf"></table></div>
+      <p class="sub" id="perf-note" style="margin:10px 0 0">Change in NAV (fair value) to the latest NAV. "—" means the tracked history doesn't go back that far yet.</p>
+    </section>
+
+    <section class="card">
+      <details>
+        <summary>Recent NAVs</summary>
+        <div class="table-wrap"><table id="recent"></table></div>
+      </details>
+    </section>
+  </div>
+
+  <footer>
+    Source: <a href="https://idlcamc.com/nav" rel="noopener">idlcamc.com/nav</a>, logged hourly by Google Apps Script. NAV = NAV at fair value. Not investment advice.
+  </footer>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+// Google Sheets "Publish to web" links (CSV). Only the NAV and Holdings tabs are published.
+// ?csv=...&holdings=... in the page URL override these (for testing).
+var CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTnZ76x1nDTVQvXKi5Iib-9fTuNEyjHfQCnR7pt-yd-ZfuCguVUjUozVTkFhPS9_PkcMaU_Vrqy59WM/pub?gid=0&single=true&output=csv';
+var HOLDINGS_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTnZ76x1nDTVQvXKi5Iib-9fTuNEyjHfQCnR7pt-yd-ZfuCguVUjUozVTkFhPS9_PkcMaU_Vrqy59WM/pub?gid=1619865244&single=true&output=csv';
+
+var FUNDS = [
+  { name: 'IDLC Balanced Fund', short: 'Balanced', color: '--series-1' },
+  { name: 'IDLC Growth Fund',   short: 'Growth',   color: '--series-2' },
+  { name: 'IDLC Income Fund',   short: 'Income',   color: '--series-3' }
+];
+
+var state = { days: 0, mode: 'nav', data: null, chart: null, holdings: {} };
+
+function num(s) { var n = Number(String(s || '').replace(/,/g, '').trim()); return isFinite(n) ? n : NaN; }
+function money(x) { return x.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+// {fund: {units, cost, avg, min, max, lots}} from Holdings rows with units > 0 and cost_per_unit > 0.
+function toHoldings(rows) {
+  if (!rows.length) return {};
+  var head = rows[0].map(function (h) { return h.trim(); });
+  var iFund = head.indexOf('fund'), iUnits = head.indexOf('units'), iCpu = head.indexOf('cost_per_unit');
+  if (iFund < 0 || iUnits < 0 || iCpu < 0) throw new Error('Unexpected Holdings columns');
+  var out = {};
+  rows.slice(1).forEach(function (r) {
+    var fund = (r[iFund] || '').trim(), units = num(r[iUnits]), cpu = num(r[iCpu]);
+    if (!fund || !(units > 0) || !(cpu > 0)) return;
+    var h = out[fund] = out[fund] || { units: 0, cost: 0, min: Infinity, max: 0, lots: 0 };
+    h.units += units; h.cost += units * cpu; h.lots++;
+    if (cpu < h.min) h.min = cpu;
+    if (cpu > h.max) h.max = cpu;
+  });
+  Object.keys(out).forEach(function (k) { out[k].avg = out[k].cost / out[k].units; });
+  return out;
+}
+
+function renderHoldings(data) {
+  var H = state.holdings, card = document.getElementById('holdings-card');
+  var funds = FUNDS.filter(function (f) { return H[f.name] && data.series[f.name]; });
+  card.hidden = !funds.length;
+  if (!funds.length) return;
+  var tCost = 0, tValue = 0;
+  var rows = funds.map(function (f) {
+    var h = H[f.name], nav = data.series[f.name][data.series[f.name].length - 1].nav;
+    var value = h.units * nav, pl = value - h.cost, plPct = pl / h.cost * 100;
+    tCost += h.cost; tValue += value;
+    return '<tr><td>' + esc(f.short) + '</td><td class="hide-sm">' + h.units.toLocaleString('en-US', { maximumFractionDigits: 4 }) + '</td><td>' + fx(h.avg) +
+      '</td><td class="hide-sm">' + fx(nav) + '</td><td>' + money(value) + '</td><td class="' + dir(plPct) + '">' +
+      (pl >= 0 ? '+' : '−') + money(Math.abs(pl)) + ' (' + pctStr(plPct) + ')</td></tr>';
+  });
+  var tPl = tValue - tCost, tPct = tPl / tCost * 100;
+  if (funds.length > 1) rows.push('<tr style="font-weight:600"><td>Total</td><td class="hide-sm"></td><td></td><td class="hide-sm"></td><td>' +
+    money(tValue) + '</td><td class="' + dir(tPct) + '">' + (tPl >= 0 ? '+' : '−') + money(Math.abs(tPl)) + ' (' + pctStr(tPct) + ')</td></tr>');
+  document.getElementById('holdings').innerHTML =
+    '<thead><tr><th>Fund</th><th class="hide-sm">Units</th><th>Avg cost</th><th class="hide-sm">NAV</th><th>Value</th><th>Profit / loss</th></tr></thead><tbody>' +
+    rows.join('') + '</tbody>';
+  document.getElementById('holdings-note').textContent =
+    'Value = units × latest NAV (fair value), in BDT. Cost = Σ units × cost per unit. The dashed lines on the chart mark your average cost.';
+}
+
+function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function fx(x) { return x.toFixed(2); }
+function pctStr(p) { return (p > 0 ? '+' : p < 0 ? '−' : '') + Math.abs(p).toFixed(2) + '%'; }
+function dir(p) { return p > 0.005 ? 'up' : p < -0.005 ? 'down' : 'flat'; }
+function arrow(p) { return p > 0.005 ? '▲' : p < -0.005 ? '▼' : '■'; }
+function addDays(d, n) { var t = new Date(d + 'T12:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); }
+function addMonths(d, n) {
+  var t = new Date(d + 'T12:00:00Z'), day = t.getUTCDate();
+  t.setUTCDate(1); t.setUTCMonth(t.getUTCMonth() + n);
+  var last = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).getUTCDate();
+  t.setUTCDate(Math.min(day, last));
+  return t.toISOString().slice(0, 10);
+}
+function niceDate(d) {
+  return new Date(d + 'T12:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+}
+function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+// Minimal RFC 4180 CSV parser.
+function parseCsv(text) {
+  var rows = [], row = [], cell = '', q = false;
+  for (var i = 0; i < text.length; i++) {
+    var c = text[i];
+    if (q) {
+      if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; }
+      else cell += c;
+    } else if (c === '"') q = true;
+    else if (c === ',') { row.push(cell); cell = ''; }
+    else if (c === '\n' || c === '\r') {
+      if (c === '\r' && text[i + 1] === '\n') i++;
+      row.push(cell); rows.push(row); row = []; cell = '';
+    } else cell += c;
+  }
+  if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+  return rows;
+}
+
+// {fund: [{date, nav}] sorted, deduped by date}, plus latest fetched_at.
+function toSeries(rows) {
+  var head = rows[0].map(function (h) { return h.trim(); });
+  var iDate = head.indexOf('nav_date'), iFund = head.indexOf('fund'), iFair = head.indexOf('nav_fair'), iFetched = head.indexOf('fetched_at');
+  if (iDate < 0 || iFund < 0 || iFair < 0) throw new Error('Unexpected CSV columns');
+  var byFund = {}, fetched = '';
+  rows.slice(1).forEach(function (r) {
+    var date = (r[iDate] || '').trim(), fund = (r[iFund] || '').trim(), nav = Number((r[iFair] || '').replace(/,/g, ''));
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !fund || !(nav > 0)) return;
+    (byFund[fund] = byFund[fund] || {})[date] = nav;
+    if (iFetched >= 0 && r[iFetched] > fetched) fetched = r[iFetched];
+  });
+  var out = {};
+  FUNDS.forEach(function (f) {
+    var m = byFund[f.name];
+    if (!m) return;
+    out[f.name] = Object.keys(m).sort().map(function (d) { return { date: d, nav: m[d] }; });
+  });
+  return { series: out, fetched: fetched };
+}
+
+// Last NAV on or before a date, or null if history starts after it.
+function navOn(list, date) {
+  if (!list.length || list[0].date > date) return null;
+  var v = null;
+  for (var i = 0; i < list.length && list[i].date <= date; i++) v = list[i];
+  return v;
+}
+
+function stats(list) {
+  var last = list[list.length - 1], prev = list.length > 1 ? list[list.length - 2] : null;
+  var from30 = addDays(last.date, -30), high30 = 0, high = 0, highDate = '';
+  list.forEach(function (p) {
+    if (p.date >= from30 && p.nav > high30) high30 = p.nav;
+    if (p.nav > high) { high = p.nav; highDate = p.date; }
+  });
+  function change(base) { return base ? (last.nav - base.nav) / base.nav * 100 : null; }
+  return {
+    last: last, prev: prev,
+    daily: prev ? (last.nav - prev.nav) / prev.nav * 100 : null,
+    off30: (last.nav - high30) / high30 * 100, high30: high30,
+    offHigh: (last.nav - high) / high * 100, high: high, highDate: highDate,
+    m1: change(navOn(list, addMonths(last.date, -1))),
+    m3: change(navOn(list, addMonths(last.date, -3))),
+    y1: change(navOn(list, addMonths(last.date, -12))),
+    all: list.length > 1 ? change(list[0]) : null,
+    first: list[0]
+  };
+}
+
+function renderCards(data) {
+  document.getElementById('funds').innerHTML = FUNDS.filter(function (f) { return data.series[f.name]; }).map(function (f) {
+    var s = stats(data.series[f.name]), h = state.holdings[f.name];
+    var mine = h ? '<span>From your avg cost (' + fx(h.avg) + ')</span><b>' + pctStr((s.last.nav - h.avg) / h.avg * 100) + '</b>' +
+      '<span>Your buy range</span><b>' + fx(h.min) + '–' + fx(h.max) + '</b>' : '';
+    var daily = s.daily === null ? '<span class="delta flat">No previous NAV yet</span>'
+      : '<span class="delta ' + dir(s.daily) + '">' + arrow(s.daily) + ' ' + pctStr(s.daily) + ' (' + (s.last.nav - s.prev.nav >= 0 ? '+' : '−') + fx(Math.abs(s.last.nav - s.prev.nav)) + ')</span>';
+    return '<div class="card">' +
+      '<div class="fund-name"><span class="swatch" style="background:var(' + f.color + ')"></span>' + esc(f.name) + '</div>' +
+      '<div class="nav">' + fx(s.last.nav) + '<small>BDT · ' + niceDate(s.last.date) + '</small></div>' + daily +
+      '<div class="facts">' +
+        '<span>From 30-day high (' + fx(s.high30) + ')</span><b>' + pctStr(s.off30) + '</b>' +
+        '<span>From tracked high (' + fx(s.high) + ')</span><b>' + pctStr(s.offHigh) + '</b>' + mine +
+      '</div></div>';
+  }).join('');
+}
+
+function cell(p) { return p === null ? '<td>—</td>' : '<td class="' + dir(p) + '">' + pctStr(p) + '</td>'; }
+
+function renderTables(data) {
+  var funds = FUNDS.filter(function (f) { return data.series[f.name]; });
+  document.getElementById('perf').innerHTML =
+    '<thead><tr><th>Fund</th><th class="hide-sm">Latest</th><th>1M</th><th>3M</th><th>1Y</th><th>Since start</th></tr></thead><tbody>' +
+    funds.map(function (f) {
+      var s = stats(data.series[f.name]);
+      return '<tr><td>' + esc(f.short) + '</td><td class="hide-sm">' + fx(s.last.nav) + '</td>' + cell(s.m1) + cell(s.m3) + cell(s.y1) + cell(s.all) + '</tr>';
+    }).join('') + '</tbody>';
+  var firsts = funds.map(function (f) { return niceDate(data.series[f.name][0].date); });
+  var uniq = firsts.filter(function (d, i) { return firsts.indexOf(d) === i; });
+  document.getElementById('perf-note').textContent =
+    'Change in NAV (fair value) to the latest NAV. "Since start" = since tracking began on ' + uniq.join(' / ') + '. "—" means the tracked history doesn\'t go back that far yet.';
+
+  var dates = allDates(data).slice(-15).reverse();
+  document.getElementById('recent').innerHTML =
+    '<thead><tr><th>Date</th>' + funds.map(function (f) { return '<th>' + esc(f.short) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+    dates.map(function (d) {
+      return '<tr><td>' + niceDate(d) + '</td>' + funds.map(function (f) {
+        var p = data.series[f.name].filter(function (x) { return x.date === d; })[0];
+        return '<td>' + (p ? fx(p.nav) : '—') + '</td>';
+      }).join('') + '</tr>';
+    }).join('') + '</tbody>';
+}
+
+function allDates(data) {
+  var set = {};
+  Object.keys(data.series).forEach(function (k) { data.series[k].forEach(function (p) { set[p.date] = 1; }); });
+  return Object.keys(set).sort();
+}
+
+// Short fund names at each line's end, nudged apart so they never overlap.
+var endLabels = {
+  id: 'endLabels',
+  afterDatasetsDraw: function (chart) {
+    var ctx = chart.ctx, items = [];
+    chart.data.datasets.forEach(function (ds, i) {
+      var meta = chart.getDatasetMeta(i);
+      if (meta.hidden || ds.isRef) return;
+      for (var j = ds.data.length - 1; j >= 0; j--) {
+        if (ds.data[j] !== null) { var pt = meta.data[j]; items.push({ y: pt.y, x: pt.x, text: ds.label }); break; }
+      }
+    });
+    items.sort(function (a, b) { return a.y - b.y; });
+    for (var k = 1; k < items.length; k++) if (items[k].y - items[k - 1].y < 15) items[k].y = items[k - 1].y + 15;
+    ctx.save();
+    ctx.font = '12px system-ui, -apple-system, "Segoe UI", sans-serif';
+    ctx.fillStyle = css('--text-2');
+    ctx.textBaseline = 'middle';
+    items.forEach(function (it) { ctx.fillText(it.text, chart.chartArea.right + 8, it.y); });
+    ctx.restore();
+  }
+};
+
+// Vertical hairline at the hovered date.
+var crosshair = {
+  id: 'crosshair',
+  afterDatasetsDraw: function (chart) {
+    var a = chart.tooltip && chart.tooltip.getActiveElements();
+    if (!a || !a.length) return;
+    var x = a[0].element.x, ctx = chart.ctx;
+    ctx.save();
+    ctx.strokeStyle = css('--axis');
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, chart.chartArea.top); ctx.lineTo(x, chart.chartArea.bottom); ctx.stroke();
+    ctx.restore();
+  }
+};
+
+function renderChart() {
+  var data = state.data;
+  var dates = allDates(data);
+  if (state.days) {
+    var from = addDays(dates[dates.length - 1], -state.days);
+    dates = dates.filter(function (d) { return d >= from; });
+  }
+  var pct = state.mode === 'pct';
+  var longRange = dates.length > 1 && dates[0] < addMonths(dates[dates.length - 1], -6);
+  var datasets = FUNDS.filter(function (f) { return data.series[f.name]; }).map(function (f) {
+    var map = {};
+    data.series[f.name].forEach(function (p) { map[p.date] = p.nav; });
+    var base = null;
+    var values = dates.map(function (d) {
+      var v = map[d];
+      if (v === undefined) return null;
+      if (base === null) base = v;
+      return pct ? (v - base) / base * 100 : v;
+    });
+    var color = css(f.color);
+    return {
+      label: f.short, data: values, borderColor: color, backgroundColor: color,
+      borderWidth: 2, pointRadius: dates.length <= 31 ? 2.5 : 0, pointHoverRadius: 5,
+      pointHoverBorderWidth: 2, pointHoverBorderColor: css('--surface'),
+      tension: 0, spanGaps: true
+    };
+  });
+
+  // Dashed average-cost line per held fund (NAV mode only).
+  if (!pct) FUNDS.forEach(function (f) {
+    var h = state.holdings[f.name];
+    if (!h || !data.series[f.name] || !dates.length) return;
+    var color = css(f.color);
+    datasets.push({
+      label: f.short + ' avg cost', isRef: true, data: dates.map(function () { return h.avg; }),
+      borderColor: color, borderWidth: 1.5, borderDash: [5, 4], pointRadius: 0, pointHoverRadius: 0, tension: 0
+    });
+  });
+
+  document.getElementById('legend').innerHTML = FUNDS.filter(function (f) { return data.series[f.name]; }).map(function (f) {
+    return '<span><i style="background:var(' + f.color + ')"></i>' + esc(f.name) + '</span>';
+  }).join('');
+
+  if (state.chart) state.chart.destroy();
+  Chart.defaults.font.family = 'system-ui, -apple-system, "Segoe UI", sans-serif';
+  Chart.defaults.color = css('--muted');
+  state.chart = new Chart(document.getElementById('chart'), {
+    type: 'line',
+    data: { labels: dates, datasets: datasets },
+    plugins: [endLabels, crosshair],
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      layout: { padding: { right: 64, top: 8 } },
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: {
+          grid: { display: false }, border: { color: css('--axis') },
+          ticks: {
+            maxRotation: 0, autoSkip: true, maxTicksLimit: window.innerWidth < 520 ? 4 : 8,
+            callback: function (v) {
+              var d = this.getLabelForValue(v);
+              return new Date(d + 'T12:00:00Z').toLocaleDateString('en-GB', longRange
+                ? { month: 'short', year: '2-digit', timeZone: 'UTC' }
+                : { day: 'numeric', month: 'short', timeZone: 'UTC' });
+            }
+          }
+        },
+        y: {
+          grid: { color: function (c) { return pct && c.tick && c.tick.value === 0 ? css('--axis') : css('--grid'); } },
+          border: { display: false },
+          ticks: { maxTicksLimit: 6, callback: function (v) { return pct ? v.toFixed(1) + '%' : v.toFixed(2); } }
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: css('--surface'), titleColor: css('--text'), bodyColor: css('--text-2'),
+          borderColor: css('--border'), borderWidth: 1, padding: 10, boxPadding: 4, usePointStyle: true,
+          titleFont: { weight: '600' },
+          filter: function (it) { return !it.dataset.isRef; },
+          callbacks: {
+            title: function (items) { return niceDate(items[0].label); },
+            label: function (it) {
+              return ' ' + it.dataset.label + ': ' + (pct ? pctStr(it.parsed.y) : fx(it.parsed.y));
+            },
+            labelPointStyle: function () { return { pointStyle: 'rect', rotation: 0 }; }
+          }
+        }
+      }
+    }
+  });
+}
+
+function wireControls() {
+  document.getElementById('range').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    state.days = Number(b.dataset.days);
+    this.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+    renderChart();
+  });
+  document.getElementById('mode').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    state.mode = b.dataset.mode;
+    this.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+    renderChart();
+  });
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { if (state.data) renderChart(); });
+  new MutationObserver(function () { if (state.data) renderChart(); })
+    .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+}
+
+function showError(detail) {
+  document.getElementById('loading').hidden = true;
+  document.getElementById('content').hidden = true;
+  document.getElementById('error').hidden = false;
+  document.getElementById('error-detail').textContent = detail || '';
+}
+
+function load() {
+  var qs = new URLSearchParams(location.search);
+  var url = qs.get('csv') || CSV_URL, hUrl = qs.get('holdings') || HOLDINGS_CSV_URL;
+  if (!url) { showError('No data feed configured (CSV_URL is empty).'); return; }
+  if (typeof Chart === 'undefined') { showError('The chart library could not be loaded.'); return; }
+  function get(u) {
+    return fetch(u + (u.indexOf('?') < 0 ? '?' : '&') + 't=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); });
+  }
+  // Holdings are optional: a failure there never blocks the NAV view.
+  var holdings = !hUrl ? Promise.resolve({}) : get(hUrl)
+    .then(function (t) { return toHoldings(parseCsv(t)); })
+    .catch(function (e) { console.error('Holdings feed:', e); return {}; });
+  Promise.all([get(url), holdings])
+    .then(function (res) {
+      var text = res[0];
+      state.holdings = res[1];
+      var data = toSeries(parseCsv(text));
+      if (!Object.keys(data.series).length) throw new Error('No NAV rows');
+      state.data = data;
+      var latest = allDates(data).pop();
+      document.getElementById('updated').textContent = 'Latest NAV ' + niceDate(latest) + (data.fetched ? ' · checked ' + data.fetched + ' (Dhaka)' : '');
+      document.getElementById('loading').hidden = true;
+      document.getElementById('content').hidden = false;
+      renderCards(data);
+      renderHoldings(data);
+      renderTables(data);
+      renderChart();
+    })
+    .catch(function (e) { showError(''); console.error('NAV feed:', e); });
+}
+
+wireControls();
+load();
+</script>
+</body>
+</html>
