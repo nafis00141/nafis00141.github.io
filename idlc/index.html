@@ -95,8 +95,15 @@
   .seg button + button { border-left: 1px solid var(--border); }
   .seg button:hover { background: var(--wash); }
   .seg button[aria-pressed="true"] { background: var(--text); color: var(--surface); }
-  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--text-2); margin-bottom: 8px; }
-  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 2px 4px; font-size: 13px; color: var(--text-2); margin: 0 0 8px -7px; }
+  .legend button {
+    display: inline-flex; align-items: center; gap: 6px; font: inherit; color: inherit; cursor: pointer;
+    background: transparent; border: 0; border-radius: 6px; padding: 3px 7px;
+  }
+  .legend button:hover { background: var(--wash); }
+  .legend button:focus-visible { outline: 2px solid var(--text-2); outline-offset: 1px; }
+  .legend button[aria-pressed="false"] { color: var(--muted); text-decoration: line-through; }
+  .legend button[aria-pressed="false"] i { opacity: .3; }
   .legend i { width: 14px; height: 2px; border-radius: 1px; display: inline-block; }
   .chart-box { position: relative; height: 340px; }
   @media (max-width: 520px) { .chart-box { height: 260px; } .nav { font-size: 26px; } .seg button { padding: 5px 8px; } }
@@ -210,7 +217,7 @@ var FUNDS = [
   { name: 'IDLC Income Fund',   short: 'Income',   color: '--series-3' }
 ];
 
-var state = { months: 12, mode: 'nav', data: null, chart: null, holdings: {} };
+var state = { months: 12, hidden: readHidden(), mode: 'nav', data: null, chart: null, holdings: {} };
 
 function num(s) { var n = Number(String(s || '').replace(/,/g, '').trim()); return isFinite(n) ? n : NaN; }
 function money(x) { return x.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -441,7 +448,8 @@ function renderChart() {
   }
   var pct = state.mode === 'pct';
   var longRange = dates.length > 1 && dates[0] < addMonths(dates[dates.length - 1], -6);
-  var datasets = FUNDS.filter(function (f) { return data.series[f.name]; }).map(function (f) {
+  var shown = function (f) { return data.series[f.name] && !state.hidden[f.name]; };
+  var datasets = FUNDS.filter(shown).map(function (f) {
     var map = {};
     data.series[f.name].forEach(function (p) { map[p.date] = p.nav; });
     var base = null;
@@ -463,7 +471,7 @@ function renderChart() {
   // Dashed average-cost line per held fund (NAV mode only).
   if (!pct) FUNDS.forEach(function (f) {
     var h = state.holdings[f.name];
-    if (!h || !data.series[f.name] || !dates.length) return;
+    if (!h || !shown(f) || !dates.length) return;
     var color = css(f.color);
     datasets.push({
       label: f.short + ' avg cost', isRef: true, data: dates.map(function () { return h.avg; }),
@@ -472,7 +480,9 @@ function renderChart() {
   });
 
   document.getElementById('legend').innerHTML = FUNDS.filter(function (f) { return data.series[f.name]; }).map(function (f) {
-    return '<span><i style="background:var(' + f.color + ')"></i>' + esc(f.name) + '</span>';
+    var on = !state.hidden[f.name];
+    return '<button type="button" data-fund="' + esc(f.name) + '" aria-pressed="' + on + '" title="' +
+      (on ? 'Hide ' : 'Show ') + esc(f.name) + '"><i style="background:var(' + f.color + ')"></i>' + esc(f.name) + '</button>';
   }).join('');
 
   if (state.chart) state.chart.destroy();
@@ -530,6 +540,16 @@ function wireControls() {
     var b = e.target.closest('button'); if (!b) return;
     state.months = Number(b.dataset.months);
     this.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+    renderChart();
+  });
+  // Click a fund in the legend to hide/show its line; at least one stays visible. Remembered on this device.
+  document.getElementById('legend').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b || !state.data) return;
+    var name = b.dataset.fund;
+    var visible = FUNDS.filter(function (f) { return state.data.series[f.name] && !state.hidden[f.name]; });
+    if (!state.hidden[name] && visible.length <= 1) return;
+    if (state.hidden[name]) delete state.hidden[name]; else state.hidden[name] = true;
+    try { localStorage.setItem('idlc-hidden-funds', JSON.stringify(state.hidden)); } catch (err) { /* storage off */ }
     renderChart();
   });
   document.getElementById('mode').addEventListener('click', function (e) {
@@ -590,6 +610,10 @@ function setBanner(mode) {
   document.getElementById('banner-text').textContent = mode === 'offline'
     ? 'Offline – showing data saved on this device. Will retry automatically.'
     : 'Showing saved data – updating to the latest…';
+}
+
+function readHidden() {
+  try { var h = JSON.parse(localStorage.getItem('idlc-hidden-funds')); return h && typeof h === 'object' ? h : {}; } catch (e) { return {}; }
 }
 
 function readCache() {
