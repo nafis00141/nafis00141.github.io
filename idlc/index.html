@@ -180,11 +180,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
 // Live feed: the Apps Script web app (apps-script/Api.gs) reads the sheet on every request,
-// so new rows show up immediately. It can only return the NAV and Holdings tabs.
-// ?csv=...&holdings=... in the page URL override these (for testing).
+// (cached there for up to 60 s). It can only return the NAV and Holdings tabs.
+// ?csv=...&holdings=... in the page URL load plain CSV URLs instead (for testing).
 var FEED_URL = 'https://script.google.com/macros/s/AKfycbz4f8212rpBBuJgZ3ISiOzx8y7FUz12fPzH6mwAQ4bQQfjA9BWN4K36f0zafwA1-KgI/exec';
-var CSV_URL = FEED_URL + '?sheet=nav';
-var HOLDINGS_CSV_URL = FEED_URL + '?sheet=holdings';
+var ALL_URL = FEED_URL + '?sheet=all';          // both tabs in one request (what the page uses)
+var CACHE_KEY = 'idlc-feed-v1';                 // last good response, shown instantly on the next visit
+var REFRESH_MS = 5 * 60 * 1000;                 // re-check while the tab is open and visible
 
 var FUNDS = [
   { name: 'IDLC Balanced Fund', short: 'Balanced', color: '--series-1' },
@@ -532,36 +533,85 @@ function showError(detail) {
   document.getElementById('error-detail').textContent = detail || '';
 }
 
-function load() {
-  var qs = new URLSearchParams(location.search);
-  var url = qs.get('csv') || CSV_URL, hUrl = qs.get('holdings') || HOLDINGS_CSV_URL;
-  if (!url) { showError('No data feed configured (CSV_URL is empty).'); return; }
-  if (typeof Chart === 'undefined') { showError('The chart library could not be loaded.'); return; }
-  function get(u) {
-    return fetch(u + (u.indexOf('?') < 0 ? '?' : '&') + 't=' + Date.now(), { cache: 'no-store' })
-      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); });
-  }
-  // Holdings are optional: a failure there never blocks the NAV view.
-  var holdings = !hUrl ? Promise.resolve({}) : get(hUrl)
-    .then(function (t) { return toHoldings(parseCsv(t)); })
-    .catch(function (e) { console.error('Holdings feed:', e); return {}; });
-  Promise.all([get(url), holdings])
-    .then(function (res) {
-      var text = res[0];
-      state.holdings = res[1];
-      var data = toSeries(parseCsv(text));
-      if (!Object.keys(data.series).length) throw new Error('No NAV rows');
-      state.data = data;
-      var latest = allDates(data).pop();
-      document.getElementById('updated').textContent = 'Latest NAV ' + niceDate(latest) + (data.fetched ? ' · checked ' + data.fetched + ' (Dhaka)' : '');
-      document.getElementById('loading').hidden = true;
-      document.getElementById('content').hidden = false;
-      renderCards(data);
-      renderHoldings(data);
-      renderTables(data);
-      renderChart();
+function get(u) {
+  return fetch(u + (u.indexOf('?') < 0 ? '?' : '&') + 't=' + Date.now(), { cache: 'no-store' })
+    .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); });
+}
+
+// Renders a feed {nav: csv, holdings: csv}. Throws if it has no NAV rows.
+function apply(feed) {
+  var data = toSeries(parseCsv(feed.nav));
+  if (!Object.keys(data.series).length) throw new Error('No NAV rows');
+  var holdings = {};
+  try { holdings = feed.holdings ? toHoldings(parseCsv(feed.holdings)) : {}; }
+  catch (e) { console.error('Holdings feed:', e); }   // holdings never block the NAV view
+  state.data = data;
+  state.holdings = holdings;
+  state.shown = feed;
+  document.getElementById('loading').hidden = true;
+  document.getElementById('error').hidden = true;
+  document.getElementById('content').hidden = false;
+  renderCards(data);
+  renderHoldings(data);
+  renderTables(data);
+  renderChart();
+}
+
+function setStatus(note) {
+  var data = state.data;
+  if (!data) return;
+  var latest = allDates(data).pop();
+  document.getElementById('updated').textContent = 'Latest NAV ' + niceDate(latest) +
+    (data.fetched ? ' · checked ' + data.fetched + ' (Dhaka)' : '') + (note ? ' · ' + note : '');
+}
+
+function readCache() {
+  try { var c = JSON.parse(localStorage.getItem(CACHE_KEY)); return c && c.nav ? c : null; } catch (e) { return null; }
+}
+function writeCache(feed) {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ nav: feed.nav, holdings: feed.holdings })); } catch (e) { /* storage off */ }
+}
+
+// Fetches the live feed; re-renders only when something changed.
+function refresh() {
+  if (state.busy) return;
+  state.busy = true;
+  state.lastTry = Date.now();
+  if (state.data) setStatus('updating…');
+  get(ALL_URL)
+    .then(function (t) {
+      var feed = JSON.parse(t);
+      var old = state.shown;
+      if (!old || old.nav !== feed.nav || old.holdings !== feed.holdings) apply(feed);
+      writeCache(feed);
+      setStatus('');
     })
-    .catch(function (e) { showError(''); console.error('NAV feed:', e); });
+    .catch(function (e) {
+      console.error('NAV feed:', e);
+      if (state.data) setStatus('offline – showing saved data'); else showError('');
+    })
+    .then(function () { state.busy = false; });
+}
+
+function load() {
+  if (typeof Chart === 'undefined') { showError('The chart library could not be loaded.'); return; }
+  var qs = new URLSearchParams(location.search);
+  if (qs.get('csv')) {   // test override: separate CSV URLs, no saved copy, no auto-refresh
+    var hUrl = qs.get('holdings');
+    Promise.all([get(qs.get('csv')), hUrl ? get(hUrl).catch(function () { return ''; }) : ''])
+      .then(function (res) { apply({ nav: res[0], holdings: res[1] }); setStatus(''); })
+      .catch(function (e) { showError(''); console.error('NAV feed:', e); });
+    return;
+  }
+  // 1. Show the copy saved on this device instantly (if any), 2. fetch the live feed in the background.
+  var saved = readCache();
+  if (saved) { try { apply(saved); } catch (e) { saved = null; } }
+  refresh();
+  // Near-real-time: re-check every few minutes while visible, and right away when the tab comes back.
+  setInterval(function () { if (!document.hidden) refresh(); }, REFRESH_MS);
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && Date.now() - (state.lastTry || 0) > 60 * 1000) refresh();
+  });
 }
 
 wireControls();
